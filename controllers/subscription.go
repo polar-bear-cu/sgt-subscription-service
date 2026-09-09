@@ -1,0 +1,31 @@
+package controllers
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/polar-bear-cu/sgt-subscription-service/dtos"
+	"github.com/polar-bear-cu/sgt-subscription-service/usecases"
+)
+
+type SubscriptionController struct {
+	uc *usecases.SubscriptionUsecase
+}
+
+func NewSubscription(uc *usecases.SubscriptionUsecase) *SubscriptionController {
+	return &SubscriptionController{uc: uc}
+}
+
+func (ctl *SubscriptionController) Create(c *gin.Context) {
+	var req dtos.CreateSubscriptionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	sub, err := ctl.uc.Create(req.Name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, dtos.SubscriptionResponse{ID: sub.ID, Name: sub.Name})
+}
