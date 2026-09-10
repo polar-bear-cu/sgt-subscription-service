@@ -10,13 +10,14 @@ REST + gRPC service สำหรับจัดการ subscription service
 
 ```
 routes/         map path -> controller
-controllers/    HTTP <-> DTO, validate, เรียก usecase
-usecases/       business logic (ไม่รู้จัก HTTP/SQL)
-repositories/   db query (interface + postgres + in-memory)
-grpc/           gRPC server
-dtos/ models/   request/response struct + db struct
+controllers/    เชื่อม HTTP กับ DTO, validate ข้อมูล แล้วเรียก usecase
+usecases/       business logic
+repositories/   db query
+grpc/           gRPC controllers
+dtos/           request/response struct
+models/         db struct
 config/         env loader + db pool
-migrations/     SQL (golang-migrate)
+migrations/     sql migration
 ```
 
 REST: `routes -> controllers -> usecases -> repositories -> Postgres`
@@ -54,3 +55,18 @@ Check `Makefile`
 ### Dev tools
 
 - pgweb: `localhost:8081` - ดู local db
+
+### Notes
+
+#### 1. ถ้ามีการแก้ proto พร้อม service นี้...
+
+```terminal
+cd ..
+go work init ./sgt-proto ./sgt-subscription-service
+```
+
+หรือถ้ามี go.work แล้ว...
+
+```terminal
+go work use ./sgt-proto ./sgt-subscription-service
+```
