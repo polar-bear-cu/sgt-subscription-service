@@ -12,7 +12,7 @@ type SubscriptionController struct {
 	uc *usecases.SubscriptionUsecase
 }
 
-func NewSubscription(uc *usecases.SubscriptionUsecase) *SubscriptionController {
+func NewSubscriptionController(uc *usecases.SubscriptionUsecase) *SubscriptionController {
 	return &SubscriptionController{uc: uc}
 }
 
@@ -22,10 +22,13 @@ func (ctl *SubscriptionController) CreateSubscription(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	sub, err := ctl.uc.Create(req.Name)
+
+	userID := c.GetString("user_id")
+	sub, err := ctl.uc.Create(c.Request.Context(), userID, req.Name)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusCreated, dtos.CreateSubscriptionResponse{ID: sub.ID, Name: sub.Name})
 }

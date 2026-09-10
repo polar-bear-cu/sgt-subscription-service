@@ -1,6 +1,8 @@
 package usecases
 
 import (
+	"context"
+
 	"github.com/polar-bear-cu/sgt-subscription-service/models"
 	"github.com/polar-bear-cu/sgt-subscription-service/repositories"
 )
@@ -13,6 +15,6 @@ func NewSubscription(repo repositories.SubscriptionRepository) *SubscriptionUsec
 	return &SubscriptionUsecase{repo: repo}
 }
 
-func (u *SubscriptionUsecase) Create(name string) (models.Subscription, error) {
-	return u.repo.Create(models.Subscription{Name: name})
+func (u *SubscriptionUsecase) Create(ctx context.Context, userID, name string) (models.Subscription, error) {
+	return u.repo.Create(ctx, models.Subscription{UserID: userID, Name: name})
 }

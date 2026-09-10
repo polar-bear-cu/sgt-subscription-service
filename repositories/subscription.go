@@ -1,29 +1,28 @@
 package repositories
 
 import (
-	"sync"
+	"context"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/polar-bear-cu/sgt-subscription-service/models"
 )
 
 type SubscriptionRepository interface {
-	Create(s models.Subscription) (models.Subscription, error)
+	Create(ctx context.Context, s models.Subscription) (models.Subscription, error)
 }
 
-type inMemorySubscription struct {
-	mu    sync.Mutex
-	items []models.Subscription
+type SubscriptionPostgres struct {
+	db *pgxpool.Pool
 }
 
-func NewInMemorySubscription() SubscriptionRepository {
-	return &inMemorySubscription{}
+func NewSubscriptionPostgres(db *pgxpool.Pool) SubscriptionRepository {
+	return &SubscriptionPostgres{db: db}
 }
 
-func (r *inMemorySubscription) Create(s models.Subscription) (models.Subscription, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	s.ID = uuid.NewString()
-	r.items = append(r.items, s)
-	return s, nil
+func (r *SubscriptionPostgres) Create(ctx context.Context, s models.Subscription) (models.Subscription, error) {
+	err := r.db.QueryRow(ctx,
+		`INSERT INTO subscriptions (user_id, name) VALUES ($1, $2) RETURNING id`,
+		s.UserID, s.Name,
+	).Scan(&s.ID)
+	return s, err
 }

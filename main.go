@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -12,19 +13,27 @@ import (
 )
 
 func main() {
-	config, err := config.Load()
+	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	r := gin.Default()
-	repo := repositories.NewInMemorySubscription()
+	ctx := context.Background()
+	pool, err := config.ConnectPostgres(ctx, cfg.DB.DSN())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer pool.Close()
+
+	repo := repositories.NewSubscriptionPostgres(pool)
 	uc := usecases.NewSubscription(repo)
-	subCtrl := controllers.NewSubscription(uc)
+	subCtrl := controllers.NewSubscriptionController(uc)
+
 	routes.Register(r, subCtrl)
 
-	log.Println("listening :" + config.Port)
-	if err := r.Run(":" + config.Port); err != nil {
+	log.Println("listening :" + cfg.Port)
+	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatal(err)
 	}
 }

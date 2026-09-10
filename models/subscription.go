@@ -1,6 +1,7 @@
 package models
 
 type Subscription struct {
-	ID   string
-	Name string
+	ID     string
+	UserID string
+	Name   string
 }

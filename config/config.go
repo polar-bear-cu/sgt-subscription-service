@@ -23,7 +23,7 @@ func (db DBConfig) DSN() string {
 
 func Load() (*Config, error) {
 	_ = godotenv.Load()
-	config := &Config{
+	cfg := &Config{
 		Port:      env("PORT", "8080"),
 		GRPCPort:  env("GRPC_PORT", "50051"),
 		JWTSecret: os.Getenv("JWT_SECRET"),
@@ -36,10 +36,10 @@ func Load() (*Config, error) {
 			SSLMode:  env("DB_SSLMODE", "disable"),
 		},
 	}
-	if config.JWTSecret == "" {
+	if cfg.JWTSecret == "" {
 		return nil, fmt.Errorf("JWT_SECRET required")
 	}
-	return config, nil
+	return cfg, nil
 }
 
 func env(k, def string) string {
