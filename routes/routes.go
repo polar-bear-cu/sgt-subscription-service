@@ -6,8 +6,8 @@ import (
 )
 
 func Register(r *gin.Engine, sub *controllers.SubscriptionController) {
-	r.GET("/health", controllers.Health)
+	r.GET("/health", controllers.GetHealth)
 
 	v1 := r.Group("/api/v1")
-	v1.POST("/subscriptions", sub.Create)
+	v1.POST("/subscriptions", sub.CreateSubscription)
 }

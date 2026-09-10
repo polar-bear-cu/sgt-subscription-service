@@ -16,7 +16,7 @@ func NewSubscription(uc *usecases.SubscriptionUsecase) *SubscriptionController {
 	return &SubscriptionController{uc: uc}
 }
 
-func (ctl *SubscriptionController) Create(c *gin.Context) {
+func (ctl *SubscriptionController) CreateSubscription(c *gin.Context) {
 	var req dtos.CreateSubscriptionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -27,5 +27,5 @@ func (ctl *SubscriptionController) Create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, dtos.SubscriptionResponse{ID: sub.ID, Name: sub.Name})
+	c.JSON(http.StatusCreated, dtos.CreateSubscriptionResponse{ID: sub.ID, Name: sub.Name})
 }
