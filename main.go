@@ -36,7 +36,7 @@ func main() {
 	uc := usecases.NewSubscription(repo)
 	subCtrl := controllers.NewSubscriptionController(uc)
 
-	go startGRPC(cfg.GRPCPort, uc)
+	go startGRPC(ctx, cfg.GRPCPort, uc)
 
 	routes.Register(r, subCtrl)
 
@@ -46,8 +46,9 @@ func main() {
 	}
 }
 
-func startGRPC(port string, uc *usecases.SubscriptionUsecase) {
-	lis, err := net.Listen("tcp", ":"+port)
+func startGRPC(ctx context.Context, port string, uc *usecases.SubscriptionUsecase) {
+	var lc net.ListenConfig
+	lis, err := lc.Listen(ctx, "tcp", ":"+port)
 	if err != nil {
 		log.Fatal(err)
 	}
