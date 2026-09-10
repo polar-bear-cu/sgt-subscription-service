@@ -34,7 +34,7 @@ gRPC: `grpc/ -> usecases -> repositories` (usecase ตัวเดียวก�
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 go install github.com/evilmartians/lefthook@latest
-go install github.com/swaggo/swag/cmd/swag@latest
+go install github.com/swaggo/swag/cmd/swag@v1.16.6
 ```
 
 ### Setup
