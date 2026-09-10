@@ -18,3 +18,7 @@ func NewSubscription(repo repositories.SubscriptionRepository) *SubscriptionUsec
 func (u *SubscriptionUsecase) Create(ctx context.Context, userID, name string) (models.Subscription, error) {
 	return u.repo.Create(ctx, models.Subscription{UserID: userID, Name: name})
 }
+
+func (u *SubscriptionUsecase) ListByUser(ctx context.Context, userID string) ([]models.Subscription, error) {
+	return u.repo.ListByUser(ctx, userID)
+}
