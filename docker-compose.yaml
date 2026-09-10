@@ -6,7 +6,7 @@ services:
       - "50051:50051"
     environment:
       DB_HOST: postgres
-      DB_PORT: "5432"
+      DB_PORT: "5433"
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: subscriptions
@@ -23,9 +23,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: subscriptions
+      PGPORT: 5433
       TZ: Asia/Bangkok
     ports:
-      - "5432:5432"
+      - "5433:5433"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -33,6 +34,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  pgweb:
+    image: sosedoff/pgweb:latest
+    ports:
+      - "8081:8081"
+    environment:
+      PGWEB_DATABASE_URL: postgres://postgres:postgres@postgres:5433/subscriptions?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   pgdata:

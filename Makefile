@@ -1,4 +1,4 @@
-DB_URL ?= postgres://postgres:postgres@localhost:5432/subscriptions?sslmode=disable
+DB_URL ?= postgres://postgres:postgres@localhost:5433/subscriptions?sslmode=disable
 
 .PHONY: run test lint tidy up down migrate-up migrate-down
 
@@ -18,7 +18,7 @@ tidy:
 	go mod tidy
 
 compose-up:
-	docker compose up --build -d
+	docker compose up --build -d --wait
 
 compose-down:
 	docker compose down

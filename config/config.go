@@ -29,7 +29,7 @@ func Load() (*Config, error) {
 		JWTSecret: os.Getenv("JWT_SECRET"),
 		DB: DBConfig{
 			Host:     env("DB_HOST", "localhost"),
-			Port:     env("DB_PORT", "5432"),
+			Port:     env("DB_PORT", "5433"),
 			User:     env("DB_USER", "postgres"),
 			Password: os.Getenv("DB_PASSWORD"),
 			Name:     env("DB_NAME", "subscriptions"),
