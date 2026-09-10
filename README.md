@@ -52,6 +52,18 @@ make migrate-up
 
 Check `Makefile`
 
+### Migrations
+
+golang-migrate, ไฟล์คู่ `up`/`down` ใน `migrations/`
+
+```terminal
+make migrate-create name=add_something
+make migrate-up
+make migrate-down
+```
+
+แก้ schema = migration ใหม่เสมอ ห้ามแก้ไฟล์ที่ merge ไปแล้ว
+
 ### Dev tools
 
 - pgweb: `localhost:8081` - ดู local db
