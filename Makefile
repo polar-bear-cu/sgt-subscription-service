@@ -22,7 +22,7 @@ docs:
 	swag init -g main.go -o docs --parseInternal
 
 compose-up:
-	docker compose up --build -d --wait
+	docker compose up -d --wait --remove-orphans
 
 compose-down:
 	docker compose down
