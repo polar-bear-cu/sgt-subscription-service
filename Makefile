@@ -1,13 +1,12 @@
-.PHONY: run build test lint tidy up down
+DB_URL ?= postgres://postgres:postgres@localhost:5432/subscriptions?sslmode=disable
+
+.PHONY: run test lint tidy up down migrate-up migrate-down
 
 run:
 	go run .
 
-build:
-	go build -o bin/server .
-
 test:
-	go test ./...
+	go test ./... -cover
 
 lint:
 	golangci-lint run
@@ -15,8 +14,14 @@ lint:
 tidy:
 	go mod tidy
 
-up:
-	docker compose up -d
+compose-up:
+	docker compose up --build -d
 
-down:
+compose-down:
 	docker compose down
+
+migrate-up:
+	migrate -path migrations -database "$(DB_URL)" up
+
+migrate-down:
+	migrate -path migrations -database "$(DB_URL)" down 1
