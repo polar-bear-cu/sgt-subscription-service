@@ -19,6 +19,8 @@ jobs:
           go-version: "1.26"
       - run: go mod download
       - run: go mod tidy && git diff --exit-code
+      - run: go install github.com/swaggo/swag/cmd/swag
+      - run: swag init -g main.go -o docs --parseInternal && git diff --exit-code docs
       - run: go vet ./...
       - uses: golangci/golangci-lint-action@v8
         with:

@@ -16,6 +16,8 @@ pre-push:
   commands:
     tidy:
       run: go mod tidy && git diff --exit-code go.mod go.sum
+    docs:
+      run: swag init -g main.go -o docs --parseInternal && git diff --exit-code docs
     lint:
       run: golangci-lint run
     build:

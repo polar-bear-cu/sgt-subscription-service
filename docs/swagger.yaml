@@ -1,0 +1,76 @@
+definitions:
+  dtos.CreateSubscriptionRequest:
+    properties:
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  dtos.CreateSubscriptionResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  dtos.HealthResponse:
+    properties:
+      serviceName:
+        type: string
+      status:
+        type: string
+      timestamp:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: REST API for the Subglutee subscription service
+  title: Subscription Service API
+  version: "1.0"
+paths:
+  /api/v1/subscriptions:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: subscription
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.CreateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dtos.CreateSubscriptionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: create a subscription
+      tags:
+      - subscriptions
+  /health:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.HealthResponse'
+      summary: health check
+      tags:
+      - ops
+swagger: "2.0"

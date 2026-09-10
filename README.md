@@ -34,6 +34,7 @@ gRPC: `grpc/ -> usecases -> repositories` (usecase ตัวเดียวก�
 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 go install github.com/evilmartians/lefthook@latest
+go install github.com/swaggo/swag/cmd/swag@latest
 ```
 
 ### Setup
@@ -46,11 +47,20 @@ cp .env.example .env
 go mod download
 make compose-up
 make migrate-up
+make run
 ```
 
 ### Useful Commands
 
 Check `Makefile`
+
+### API Docs (Swagger)
+
+```terminal
+make docs
+```
+
+Document is at http://localhost:8080/swagger/index.html (ต้อง `ENABLE_SWAGGER=true`)
 
 ### Migrations
 

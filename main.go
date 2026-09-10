@@ -12,12 +12,16 @@ import (
 	subscriptionv1 "github.com/polar-bear-cu/sgt-proto/gen/go/subscription/v1"
 	"github.com/polar-bear-cu/sgt-subscription-service/config"
 	"github.com/polar-bear-cu/sgt-subscription-service/controllers"
+	_ "github.com/polar-bear-cu/sgt-subscription-service/docs"
 	grpcserver "github.com/polar-bear-cu/sgt-subscription-service/grpc"
 	"github.com/polar-bear-cu/sgt-subscription-service/repositories"
 	"github.com/polar-bear-cu/sgt-subscription-service/routes"
 	"github.com/polar-bear-cu/sgt-subscription-service/usecases"
 )
 
+// @title        Subscription Service API
+// @version      1.0
+// @description  REST API for the Subglutee subscription service
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -38,7 +42,7 @@ func main() {
 
 	go startGRPC(ctx, cfg.GRPCPort, uc)
 
-	routes.Register(r, subCtrl)
+	routes.Register(r, subCtrl, cfg.SwaggerEnabled)
 
 	log.Println("listening :" + cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {

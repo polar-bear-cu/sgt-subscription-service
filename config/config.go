@@ -8,10 +8,11 @@ import (
 )
 
 type Config struct {
-	Port      string
-	GRPCPort  string
-	JWTSecret string
-	DB        DBConfig
+	Port           string
+	GRPCPort       string
+	JWTSecret      string
+	SwaggerEnabled bool
+	DB             DBConfig
 }
 
 type DBConfig struct{ Host, Port, User, Password, Name, SSLMode string }
@@ -24,9 +25,10 @@ func (db DBConfig) DSN() string {
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 	cfg := &Config{
-		Port:      env("PORT", "8080"),
-		GRPCPort:  env("GRPC_PORT", "50051"),
-		JWTSecret: os.Getenv("JWT_SECRET"),
+		Port:           env("PORT", "8080"),
+		GRPCPort:       env("GRPC_PORT", "50051"),
+		JWTSecret:      os.Getenv("JWT_SECRET"),
+		SwaggerEnabled: env("ENABLE_SWAGGER", "false") == "true",
 		DB: DBConfig{
 			Host:     env("DB_HOST", "localhost"),
 			Port:     env("DB_PORT", "5433"),
