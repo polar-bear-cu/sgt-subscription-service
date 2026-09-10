@@ -10,7 +10,8 @@ import (
 
 func GetHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, dtos.HealthResponse{
-		Status:    "ok",
-		Timestamp: time.Now(),
+		Status:      "ok",
+		Timestamp:   time.Now(),
+		ServiceName: "subscription",
 	})
 }
