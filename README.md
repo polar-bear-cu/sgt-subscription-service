@@ -50,6 +50,13 @@ make migrate-up
 make run
 ```
 
+### Run alternatively (container)
+
+```terminal
+make image
+make container
+```
+
 ### Useful Commands
 
 Check `Makefile`
