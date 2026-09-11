@@ -90,9 +90,13 @@ const docTemplate = `{
         "dtos.CreateSubscriptionRequest": {
             "type": "object",
             "required": [
+                "billingDate",
                 "name"
             ],
             "properties": {
+                "billingDate": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 }
@@ -101,6 +105,9 @@ const docTemplate = `{
         "dtos.CreateSubscriptionResponse": {
             "type": "object",
             "properties": {
+                "billingDate": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },

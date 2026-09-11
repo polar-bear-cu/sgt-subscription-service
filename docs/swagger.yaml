@@ -1,13 +1,18 @@
 definitions:
   dtos.CreateSubscriptionRequest:
     properties:
+      billingDate:
+        type: string
       name:
         type: string
     required:
+    - billingDate
     - name
     type: object
   dtos.CreateSubscriptionResponse:
     properties:
+      billingDate:
+        type: string
       id:
         type: string
       name:

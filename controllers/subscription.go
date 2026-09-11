@@ -34,11 +34,15 @@ func (ctl *SubscriptionController) CreateSubscription(c *gin.Context) {
 	}
 
 	userID := c.GetString("user_id")
-	sub, err := ctl.uc.Create(c.Request.Context(), userID, req.Name)
+	sub, err := ctl.uc.Create(c.Request.Context(), userID, req.Name, req.BillingDate)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, dtos.CreateSubscriptionResponse{ID: sub.ID, Name: sub.Name})
+	c.JSON(http.StatusCreated, dtos.CreateSubscriptionResponse{
+		ID:          sub.ID,
+		Name:        sub.Name,
+		BillingDate: sub.BillingDate,
+	})
 }
