@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
+	"net/http"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	grpclib "google.golang.org/grpc"
@@ -28,8 +33,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	r := gin.Default()
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	pool, err := config.ConnectPostgres(ctx, cfg.DB.DSN())
 	if err != nil {
 		log.Fatal(err)
@@ -40,29 +46,48 @@ func main() {
 	uc := usecases.NewSubscription(repo)
 	subCtrl := controllers.NewSubscriptionController(uc)
 
-	go startGRPC(ctx, cfg.GRPCPort, uc)
-
-	routes.Register(r, subCtrl, cfg.SwaggerEnabled)
-
-	log.Println("listening :" + cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func startGRPC(ctx context.Context, port string, uc *usecases.SubscriptionUsecase) {
-	var lc net.ListenConfig
-	lis, err := lc.Listen(ctx, "tcp", ":"+port)
+	gs, lis, err := newGRPCServer(cfg.GRPCPort, uc)
 	if err != nil {
 		log.Fatal(err)
+	}
+	go func() {
+		log.Println("gRPC :" + cfg.GRPCPort)
+		if err := gs.Serve(lis); err != nil {
+			log.Printf("grpc serve: %v", err)
+		}
+	}()
+
+	r := gin.Default()
+	routes.Register(r, subCtrl, cfg.SwaggerEnabled)
+	srv := &http.Server{Addr: ":" + cfg.Port, Handler: r}
+
+	go func() {
+		log.Println("listening :" + cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatal(err)
+		}
+	}()
+
+	<-ctx.Done()
+	stop()
+	log.Println("shutting down")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("http shutdown: %v", err)
+	}
+	gs.GracefulStop()
+}
+
+func newGRPCServer(port string, uc *usecases.SubscriptionUsecase) (*grpclib.Server, net.Listener, error) {
+	lis, err := net.Listen("tcp", ":"+port)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	gs := grpclib.NewServer()
 	subscriptionv1.RegisterSubscriptionServiceServer(gs, grpcserver.NewSubscriptionServer(uc))
 	reflection.Register(gs)
-
-	log.Println("gRPC :" + port)
-	if err := gs.Serve(lis); err != nil {
-		log.Fatal(err)
-	}
+	return gs, lis, nil
 }
