@@ -53,7 +53,7 @@ func toProtoList(subs []models.Subscription) []*subscriptionv1.Subscription {
 			Id:          sub.ID,
 			UserId:      sub.UserID,
 			Name:        sub.Name,
-			BillingDate: timestamppb.New(sub.BillingDate),
+			BillingDate: timestamppb.New(sub.NextBillingDate),
 		})
 	}
 	return out

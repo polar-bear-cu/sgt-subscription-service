@@ -16,5 +16,11 @@ func Register(r *gin.Engine, sub *controllers.SubscriptionController, swaggerEna
 	}
 
 	v1 := r.Group("/api/v1")
-	v1.POST("/subscriptions", sub.CreateSubscription)
+
+	subs := v1.Group("/subscriptions")
+	subs.POST("", sub.Create)
+	subs.GET("/:id", sub.GetByID)
+	subs.PUT("/:id", sub.Update)
+	subs.PATCH("/:id", sub.UpdateStatus)
+	subs.DELETE("/:id", sub.Delete)
 }
