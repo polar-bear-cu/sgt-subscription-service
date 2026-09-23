@@ -58,7 +58,7 @@ func main() {
 	}()
 
 	r := gin.Default()
-	routes.Register(r, subCtrl, cfg.SwaggerEnabled)
+	routes.Register(r, subCtrl, cfg.JWTSecret, cfg.SwaggerEnabled)
 	srv := &http.Server{Addr: ":" + cfg.Port, Handler: r}
 
 	go func() {

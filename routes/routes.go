@@ -6,9 +6,10 @@ import (
 	ginswagger "github.com/swaggo/gin-swagger"
 
 	"github.com/polar-bear-cu/sgt-subscription-service/controllers"
+	"github.com/polar-bear-cu/sgt-subscription-service/middlewares"
 )
 
-func Register(r *gin.Engine, sub *controllers.SubscriptionController, swaggerEnabled bool) {
+func Register(r *gin.Engine, sub *controllers.SubscriptionController, jwtSecret string, swaggerEnabled bool) {
 	r.GET("/health", controllers.GetHealth)
 
 	if swaggerEnabled {
@@ -16,6 +17,7 @@ func Register(r *gin.Engine, sub *controllers.SubscriptionController, swaggerEna
 	}
 
 	v1 := r.Group("/api/v1")
+	v1.Use(middlewares.RequireAuth(jwtSecret))
 
 	subs := v1.Group("/subscriptions")
 	subs.POST("", sub.Create)
