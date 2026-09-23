@@ -407,4 +407,10 @@ paths:
       summary: health check
       tags:
       - ops
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer " followed by the access token from sgt-auth-service.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
