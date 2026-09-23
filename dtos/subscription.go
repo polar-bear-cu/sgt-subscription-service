@@ -30,3 +30,27 @@ type SubscriptionResponse struct {
 	CreatedAt              time.Time  `json:"createdAt"`
 	UpdatedAt              time.Time  `json:"updatedAt"`
 }
+
+type ListSubscriptionsQuery struct {
+	Name     string `form:"name"`
+	Category string `form:"category" binding:"omitempty,oneof=streaming music productivity technology"`
+	Status   string `form:"status" binding:"omitempty,oneof=active free_trial inactive"`
+	Type     string `form:"type" binding:"omitempty,oneof=monthly yearly"`
+	SortBy   string `form:"sortBy" binding:"omitempty,oneof=name category status type cost nextBillingDate"`
+	Order    string `form:"order" binding:"omitempty,oneof=asc desc"`
+	Page     int    `form:"page"`
+	Limit    int    `form:"limit"`
+}
+
+type ListSubscriptionsResponse struct {
+	Items      []SubscriptionResponse `json:"items"`
+	Page       int                    `json:"page"`
+	Limit      int                    `json:"limit"`
+	Total      int                    `json:"total"`
+	TotalPages int                    `json:"totalPages"`
+}
+
+type SummaryResponse struct {
+	Count       int     `json:"count"`
+	MonthlyCost float64 `json:"monthlyCost"`
+}

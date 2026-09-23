@@ -8,6 +8,21 @@ definitions:
       timestamp:
         type: string
     type: object
+  dtos.ListSubscriptionsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dtos.SubscriptionResponse'
+        type: array
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      totalPages:
+        type: integer
+    type: object
   dtos.SubscriptionRequest:
     properties:
       category:
@@ -73,6 +88,13 @@ definitions:
       updatedAt:
         type: string
     type: object
+  dtos.SummaryResponse:
+    properties:
+      count:
+        type: integer
+      monthlyCost:
+        type: number
+    type: object
   dtos.UpdateStatusRequest:
     properties:
       status:
@@ -91,6 +113,78 @@ info:
   version: "1.0"
 paths:
   /api/v1/subscriptions:
+    get:
+      parameters:
+      - enum:
+        - streaming
+        - music
+        - productivity
+        - technology
+        in: query
+        name: category
+        type: string
+      - in: query
+        name: limit
+        type: integer
+      - in: query
+        name: name
+        type: string
+      - enum:
+        - asc
+        - desc
+        in: query
+        name: order
+        type: string
+      - in: query
+        name: page
+        type: integer
+      - enum:
+        - name
+        - category
+        - status
+        - type
+        - cost
+        - nextBillingDate
+        in: query
+        name: sortBy
+        type: string
+      - enum:
+        - active
+        - free_trial
+        - inactive
+        in: query
+        name: status
+        type: string
+      - enum:
+        - monthly
+        - yearly
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.ListSubscriptionsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: list my subscriptions (filter, sort, paginate)
+      tags:
+      - subscriptions
     post:
       consumes:
       - application/json
@@ -278,6 +372,27 @@ paths:
       security:
       - BearerAuth: []
       summary: update a subscription (all fields)
+      tags:
+      - subscriptions
+  /api/v1/subscriptions/summary:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.SummaryResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: count and monthly cost of my active / free-trial subscriptions (yearly
+        / 12)
       tags:
       - subscriptions
   /health:

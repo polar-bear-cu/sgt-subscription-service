@@ -46,6 +46,71 @@ func (ctl *SubscriptionController) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, toResponse(sub))
 }
 
+// List godoc
+// @Summary  list my subscriptions (filter, sort, paginate)
+// @Tags     subscriptions
+// @Produce  json
+// @Param    query  query     dtos.ListSubscriptionsQuery  false  "filters, sort and pagination"
+// @Success  200    {object}  dtos.ListSubscriptionsResponse
+// @Failure  400    {object}  map[string]string
+// @Failure  401    {object}  map[string]string
+// @Security BearerAuth
+// @Router   /api/v1/subscriptions [get]
+func (ctl *SubscriptionController) List(c *gin.Context) {
+	var q dtos.ListSubscriptionsQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	res, err := ctl.uc.List(c.Request.Context(), c.GetString("user_id"), usecases.ListQuery{
+		Name:     q.Name,
+		Category: q.Category,
+		Status:   q.Status,
+		Type:     q.Type,
+		SortBy:   q.SortBy,
+		Order:    q.Order,
+		Page:     q.Page,
+		Limit:    q.Limit,
+	})
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+
+	items := make([]dtos.SubscriptionResponse, 0, len(res.Items))
+	for _, s := range res.Items {
+		items = append(items, toResponse(s))
+	}
+	c.JSON(http.StatusOK, dtos.ListSubscriptionsResponse{
+		Items:      items,
+		Page:       res.Page,
+		Limit:      res.Limit,
+		Total:      res.Total,
+		TotalPages: res.TotalPages,
+	})
+}
+
+// GetSummary godoc
+// @Summary  count and monthly cost of my active / free-trial subscriptions (yearly / 12)
+// @Tags     subscriptions
+// @Produce  json
+// @Success  200  {object}  dtos.SummaryResponse
+// @Failure  401  {object}  map[string]string
+// @Security BearerAuth
+// @Router   /api/v1/subscriptions/summary [get]
+func (ctl *SubscriptionController) GetSummary(c *gin.Context) {
+	sum, err := ctl.uc.Summary(c.Request.Context(), c.GetString("user_id"))
+	if err != nil {
+		respondErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, dtos.SummaryResponse{
+		Count:       sum.Count,
+		MonthlyCost: sum.MonthlyCost,
+	})
+}
+
 // GetByID godoc
 // @Summary  get a subscription
 // @Tags     subscriptions

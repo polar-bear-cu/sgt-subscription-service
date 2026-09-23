@@ -3,6 +3,8 @@ package repositories
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -18,6 +20,8 @@ type SubscriptionRepository interface {
 	Update(ctx context.Context, s models.Subscription) (models.Subscription, error)
 	UpdateStatus(ctx context.Context, id, userID, status string) (models.Subscription, error)
 	Delete(ctx context.Context, id, userID string) error
+	List(ctx context.Context, userID string, p ListParams) ([]models.Subscription, int, error)
+	Summary(ctx context.Context, userID string) (models.SubscriptionSummary, error)
 	ListByUser(ctx context.Context, userID string) ([]models.Subscription, error)
 	ListUpcomingForBilling(ctx context.Context, within time.Duration) ([]models.Subscription, error)
 }
@@ -29,6 +33,26 @@ type SubscriptionPostgres struct {
 // Constructor
 func NewSubscriptionPostgres(db *pgxpool.Pool) SubscriptionRepository {
 	return &SubscriptionPostgres{db: db}
+}
+
+type ListParams struct {
+	Name     string
+	Category string
+	Status   string
+	Type     string
+	SortBy   string
+	Order    string
+	Limit    int
+	Offset   int
+}
+
+var sortColumns = map[string]string{
+	"name":            "name",
+	"category":        "category",
+	"status":          "status",
+	"type":            "type",
+	"cost":            "cost",
+	"nextBillingDate": "next_billing_date",
 }
 
 const subscriptionColumns = `id, user_id, name, cost, type, category, next_billing_date,
@@ -89,6 +113,49 @@ func (r *SubscriptionPostgres) Delete(ctx context.Context, id, userID string) er
 	return nil
 }
 
+func (r *SubscriptionPostgres) List(ctx context.Context, userID string, p ListParams) ([]models.Subscription, int, error) {
+	where, args := buildListFilter(userID, p)
+
+	var total int
+	if err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM subscriptions`+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	column, ok := sortColumns[p.SortBy]
+	if !ok {
+		column = "next_billing_date"
+	}
+	direction := "ASC"
+	if p.Order == "desc" {
+		direction = "DESC"
+	}
+
+	args = append(args, p.Limit, p.Offset)
+	query := fmt.Sprintf(`SELECT %s FROM subscriptions%s ORDER BY %s %s, id LIMIT $%d OFFSET $%d`,
+		subscriptionColumns, where, column, direction, len(args)-1, len(args))
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	subs, err := scanSubscriptions(rows)
+	return subs, total, err
+}
+
+func (r *SubscriptionPostgres) Summary(ctx context.Context, userID string) (models.SubscriptionSummary, error) {
+	var sum models.SubscriptionSummary
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*),
+		        ROUND(COALESCE(SUM(CASE WHEN type = $2 THEN cost / 12 ELSE cost END), 0), 2)
+		 FROM subscriptions
+		 WHERE user_id = $1 AND status IN ($3, $4)`,
+		userID, models.TypeYearly, models.StatusActive, models.StatusFreeTrial,
+	).Scan(&sum.Count, &sum.MonthlyCost)
+	return sum, err
+}
+
 func (r *SubscriptionPostgres) ListByUser(ctx context.Context, userID string) ([]models.Subscription, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+subscriptionColumns+` FROM subscriptions WHERE user_id = $1 ORDER BY next_billing_date`,
@@ -139,4 +206,33 @@ func scanSubscriptions(rows pgx.Rows) ([]models.Subscription, error) {
 		out = append(out, s)
 	}
 	return out, rows.Err()
+}
+
+func buildListFilter(userID string, p ListParams) (string, []any) {
+	conds := []string{"user_id = $1"}
+	args := []any{userID}
+	add := func(cond string, v any) {
+		args = append(args, v)
+		conds = append(conds, fmt.Sprintf(cond, len(args)))
+	}
+
+	if p.Name != "" {
+		add(`name ILIKE '%%' || $%d || '%%'`, escapeLike(p.Name))
+	}
+	if p.Category != "" {
+		add("category = $%d", p.Category)
+	}
+	if p.Status != "" {
+		add("status = $%d", p.Status)
+	}
+	if p.Type != "" {
+		add("type = $%d", p.Type)
+	}
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+func escapeLike(s string) string {
+	return likeEscaper.Replace(s)
 }

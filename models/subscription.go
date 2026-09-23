@@ -34,3 +34,8 @@ type Subscription struct {
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 }
+
+type SubscriptionSummary struct {
+	Count       int
+	MonthlyCost float64
+}

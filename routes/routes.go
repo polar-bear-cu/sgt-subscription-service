@@ -20,6 +20,8 @@ func Register(r *gin.Engine, sub *controllers.SubscriptionController, jwtSecret 
 	v1.Use(middlewares.RequireAuth(jwtSecret))
 
 	subs := v1.Group("/subscriptions")
+	subs.GET("", sub.List)
+	subs.GET("/summary", sub.GetSummary)
 	subs.POST("", sub.Create)
 	subs.GET("/:id", sub.GetByID)
 	subs.PUT("/:id", sub.Update)

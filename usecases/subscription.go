@@ -68,6 +68,65 @@ func (u *SubscriptionUsecase) Delete(ctx context.Context, userID, id string) err
 	return u.repo.Delete(ctx, id, userID)
 }
 
+const (
+	defaultPageLimit = 10
+	maxPageLimit     = 100
+)
+
+type ListQuery struct {
+	Name     string
+	Category string
+	Status   string
+	Type     string
+	SortBy   string
+	Order    string
+	Page     int
+	Limit    int
+}
+
+type ListResult struct {
+	Items      []models.Subscription
+	Page       int
+	Limit      int
+	Total      int
+	TotalPages int
+}
+
+func (u *SubscriptionUsecase) List(ctx context.Context, userID string, q ListQuery) (ListResult, error) {
+	page := max(q.Page, 1)
+	limit := q.Limit
+	if limit <= 0 {
+		limit = defaultPageLimit
+	}
+	limit = min(limit, maxPageLimit)
+
+	items, total, err := u.repo.List(ctx, userID, repositories.ListParams{
+		Name:     q.Name,
+		Category: q.Category,
+		Status:   q.Status,
+		Type:     q.Type,
+		SortBy:   q.SortBy,
+		Order:    q.Order,
+		Limit:    limit,
+		Offset:   (page - 1) * limit,
+	})
+	if err != nil {
+		return ListResult{}, err
+	}
+
+	return ListResult{
+		Items:      items,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: (total + limit - 1) / limit,
+	}, nil
+}
+
+func (u *SubscriptionUsecase) Summary(ctx context.Context, userID string) (models.SubscriptionSummary, error) {
+	return u.repo.Summary(ctx, userID)
+}
+
 func (u *SubscriptionUsecase) ListByUser(ctx context.Context, userID string) ([]models.Subscription, error) {
 	return u.repo.ListByUser(ctx, userID)
 }
