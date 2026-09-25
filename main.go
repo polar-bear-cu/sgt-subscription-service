@@ -27,6 +27,11 @@ import (
 // @title        Subscription Service API
 // @version      1.0
 // @description  REST API for the Subglutee subscription service
+//
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
+// @description                 Type "Bearer " followed by the access token from sgt-auth-service.
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -58,7 +63,7 @@ func main() {
 	}()
 
 	r := gin.Default()
-	routes.Register(r, subCtrl, cfg.SwaggerEnabled)
+	routes.Register(r, subCtrl, cfg.JWTSecret, cfg.SwaggerEnabled)
 	srv := &http.Server{Addr: ":" + cfg.Port, Handler: r}
 
 	go func() {
