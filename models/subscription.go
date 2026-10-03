@@ -28,6 +28,7 @@ type Subscription struct {
 	Type                   string
 	Category               string
 	NextBillingDate        time.Time
+	BillingDay             int
 	ReminderTimeInAdvanced int64
 	FtEndDate              *time.Time
 	Status                 string

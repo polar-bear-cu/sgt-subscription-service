@@ -55,18 +55,18 @@ var sortColumns = map[string]string{
 	"nextBillingDate": "next_billing_date",
 }
 
-const subscriptionColumns = `id, user_id, name, cost, type, category, next_billing_date,
+const subscriptionColumns = `id, user_id, name, cost, type, category, next_billing_date, billing_day,
 	reminder_time_in_advanced, ft_end_date, status, created_at, updated_at`
 
 // Methods
 func (r *SubscriptionPostgres) Create(ctx context.Context, s models.Subscription) (models.Subscription, error) {
 	row := r.db.QueryRow(ctx,
 		`INSERT INTO subscriptions
-			(user_id, name, cost, type, category, next_billing_date, reminder_time_in_advanced, ft_end_date, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			(user_id, name, cost, type, category, next_billing_date, reminder_time_in_advanced, ft_end_date, status, billing_day)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		 RETURNING `+subscriptionColumns,
 		s.UserID, s.Name, s.Cost, s.Type, s.Category, s.NextBillingDate,
-		s.ReminderTimeInAdvanced, s.FtEndDate, s.Status,
+		s.ReminderTimeInAdvanced, s.FtEndDate, s.Status, s.BillingDay,
 	)
 	return scanSubscription(row)
 }
@@ -83,11 +83,11 @@ func (r *SubscriptionPostgres) Update(ctx context.Context, s models.Subscription
 	row := r.db.QueryRow(ctx,
 		`UPDATE subscriptions
 		 SET name = $3, cost = $4, type = $5, category = $6, next_billing_date = $7,
-		     reminder_time_in_advanced = $8, ft_end_date = $9, status = $10, updated_at = now()
+		     reminder_time_in_advanced = $8, ft_end_date = $9, status = $10, billing_day = $11, updated_at = now()
 		 WHERE id = $1 AND user_id = $2
 		 RETURNING `+subscriptionColumns,
 		s.ID, s.UserID, s.Name, s.Cost, s.Type, s.Category, s.NextBillingDate,
-		s.ReminderTimeInAdvanced, s.FtEndDate, s.Status,
+		s.ReminderTimeInAdvanced, s.FtEndDate, s.Status, s.BillingDay,
 	)
 	return scanSubscription(row)
 }
@@ -187,7 +187,7 @@ func (r *SubscriptionPostgres) ListUpcomingForBilling(ctx context.Context, withi
 func scanSubscription(row pgx.Row) (models.Subscription, error) {
 	var s models.Subscription
 	err := row.Scan(
-		&s.ID, &s.UserID, &s.Name, &s.Cost, &s.Type, &s.Category, &s.NextBillingDate,
+		&s.ID, &s.UserID, &s.Name, &s.Cost, &s.Type, &s.Category, &s.NextBillingDate, &s.BillingDay,
 		&s.ReminderTimeInAdvanced, &s.FtEndDate, &s.Status, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

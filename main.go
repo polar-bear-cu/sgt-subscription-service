@@ -38,6 +38,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	loc, err := time.LoadLocation("Asia/Bangkok")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -48,7 +53,7 @@ func main() {
 	defer pool.Close()
 
 	repo := repositories.NewSubscriptionPostgres(pool)
-	uc := usecases.NewSubscription(repo)
+	uc := usecases.NewSubscription(repo, loc)
 	subCtrl := controllers.NewSubscriptionController(uc)
 
 	gs, lis, err := newGRPCServer(ctx, cfg.GRPCPort, uc)

@@ -25,17 +25,20 @@ type SubscriptionInput struct {
 
 type SubscriptionUsecase struct {
 	repo repositories.SubscriptionRepository
+	loc  *time.Location
 }
 
-func NewSubscription(repo repositories.SubscriptionRepository) *SubscriptionUsecase {
-	return &SubscriptionUsecase{repo: repo}
+func NewSubscription(repo repositories.SubscriptionRepository, loc *time.Location) *SubscriptionUsecase {
+	return &SubscriptionUsecase{repo: repo, loc: loc}
 }
 
 func (u *SubscriptionUsecase) Create(ctx context.Context, userID string, in SubscriptionInput) (models.Subscription, error) {
 	if err := validateInput(&in); err != nil {
 		return models.Subscription{}, err
 	}
-	return u.repo.Create(ctx, toModel(userID, in))
+	s := toModel(userID, in)
+	s.BillingDay = in.NextBillingDate.In(u.loc).Day()
+	return u.repo.Create(ctx, s)
 }
 
 func (u *SubscriptionUsecase) GetByID(ctx context.Context, userID, id string) (models.Subscription, error) {
@@ -46,8 +49,18 @@ func (u *SubscriptionUsecase) Update(ctx context.Context, userID, id string, in 
 	if err := validateInput(&in); err != nil {
 		return models.Subscription{}, err
 	}
+	current, err := u.repo.FindByID(ctx, id, userID)
+	if err != nil {
+		return models.Subscription{}, err
+	}
+
 	s := toModel(userID, in)
 	s.ID = id
+	// Keep the anchor when the date is unchanged: a date clamped to Feb 28 must still return to the 31st.
+	s.BillingDay = current.BillingDay
+	if !in.NextBillingDate.Equal(current.NextBillingDate) {
+		s.BillingDay = in.NextBillingDate.In(u.loc).Day()
+	}
 	return u.repo.Update(ctx, s)
 }
 
