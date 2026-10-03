@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,7 +22,7 @@ type SubscriptionRepository interface {
 	List(ctx context.Context, userID string, p ListParams) ([]models.Subscription, int, error)
 	Summary(ctx context.Context, userID string) (models.SubscriptionSummary, error)
 	ListByUser(ctx context.Context, userID string) ([]models.Subscription, error)
-	ListUpcomingForBilling(ctx context.Context, within time.Duration) ([]models.Subscription, error)
+	ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error)
 }
 
 type SubscriptionPostgres struct {
@@ -168,19 +167,40 @@ func (r *SubscriptionPostgres) ListByUser(ctx context.Context, userID string) ([
 	return scanSubscriptions(rows)
 }
 
-func (r *SubscriptionPostgres) ListUpcomingForBilling(ctx context.Context, within time.Duration) ([]models.Subscription, error) {
+func (r *SubscriptionPostgres) ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT `+subscriptionColumns+` FROM subscriptions
-		 WHERE status IN ($1, $2)
-		   AND next_billing_date BETWEEN now() AND $3
-		 ORDER BY next_billing_date`,
-		models.StatusActive, models.StatusFreeTrial, time.Now().Add(within),
+		`WITH d AS (
+			SELECT `+subscriptionColumns+`,
+				(next_billing_date AT TIME ZONE 'Asia/Bangkok')::date - reminder_time_in_advanced::int = $1::date
+					AS billing_due,
+				COALESCE(status = $3
+					AND (ft_end_date AT TIME ZONE 'Asia/Bangkok')::date - reminder_time_in_advanced::int = $1::date, false)
+					AS trial_end_due
+			FROM subscriptions
+			WHERE status IN ($2, $3)
+		)
+		SELECT * FROM d WHERE billing_due OR trial_end_due ORDER BY id`,
+		date, models.StatusActive, models.StatusFreeTrial,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanSubscriptions(rows)
+
+	out := make([]models.DueReminder, 0)
+	for rows.Next() {
+		var d models.DueReminder
+		s := &d.Subscription
+		if err := rows.Scan(
+			&s.ID, &s.UserID, &s.Name, &s.Cost, &s.Type, &s.Category, &s.NextBillingDate, &s.BillingDay,
+			&s.ReminderTimeInAdvanced, &s.FtEndDate, &s.Status, &s.CreatedAt, &s.UpdatedAt,
+			&d.BillingDue, &d.TrialEndDue,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
 }
 
 // Helpers

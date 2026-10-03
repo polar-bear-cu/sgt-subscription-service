@@ -36,6 +36,12 @@ type Subscription struct {
 	UpdatedAt              time.Time
 }
 
+type DueReminder struct {
+	Subscription
+	BillingDue  bool
+	TrialEndDue bool
+}
+
 type SubscriptionSummary struct {
 	Count       int
 	MonthlyCost float64

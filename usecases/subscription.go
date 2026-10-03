@@ -144,8 +144,8 @@ func (u *SubscriptionUsecase) ListByUser(ctx context.Context, userID string) ([]
 	return u.repo.ListByUser(ctx, userID)
 }
 
-func (u *SubscriptionUsecase) GetUpcomingForBilling(ctx context.Context, within time.Duration) ([]models.Subscription, error) {
-	return u.repo.ListUpcomingForBilling(ctx, within)
+func (u *SubscriptionUsecase) ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error) {
+	return u.repo.ListDueReminders(ctx, date)
 }
 
 func validateInput(in *SubscriptionInput) error {

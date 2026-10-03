@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	subscriptionv1 "github.com/polar-bear-cu/sgt-proto/gen/go/subscription/v1"
@@ -32,29 +34,59 @@ func (s *SubscriptionServer) GetSubscriptionsForReport(
 	return &subscriptionv1.GetSubscriptionsForReportResponse{Subscription: toProtoList(subs)}, nil
 }
 
-func (s *SubscriptionServer) GetUpcomingForBilling(
+func (s *SubscriptionServer) ListDueReminders(
 	ctx context.Context,
-	req *subscriptionv1.GetUpcomingForBillingRequest,
-) (*subscriptionv1.GetUpcomingForBillingResponse, error) {
-	within := time.Duration(req.GetWithinHours()) * time.Hour
+	req *subscriptionv1.ListDueRemindersRequest,
+) (*subscriptionv1.ListDueRemindersResponse, error) {
+	if err := validateDate(req.GetDate()); err != nil {
+		return nil, err
+	}
 
-	subs, err := s.uc.GetUpcomingForBilling(ctx, within)
+	due, err := s.uc.ListDueReminders(ctx, req.GetDate())
 	if err != nil {
 		return nil, err
 	}
 
-	return &subscriptionv1.GetUpcomingForBillingResponse{Subscription: toProtoList(subs)}, nil
+	out := make([]*subscriptionv1.DueReminder, 0, len(due))
+	for _, d := range due {
+		out = append(out, &subscriptionv1.DueReminder{
+			Subscription: toProto(d.Subscription),
+			BillingDue:   d.BillingDue,
+			TrialEndDue:  d.TrialEndDue,
+		})
+	}
+	return &subscriptionv1.ListDueRemindersResponse{Reminders: out}, nil
+}
+
+func validateDate(date string) error {
+	if _, err := time.Parse(time.DateOnly, date); err != nil {
+		return status.Error(codes.InvalidArgument, "date must be YYYY-MM-DD")
+	}
+	return nil
+}
+
+func toProto(sub models.Subscription) *subscriptionv1.Subscription {
+	p := &subscriptionv1.Subscription{
+		Id:                     sub.ID,
+		UserId:                 sub.UserID,
+		Name:                   sub.Name,
+		BillingDate:            timestamppb.New(sub.NextBillingDate),
+		Cost:                   sub.Cost,
+		Type:                   sub.Type,
+		Category:               sub.Category,
+		Status:                 sub.Status,
+		ReminderTimeInAdvanced: sub.ReminderTimeInAdvanced,
+	}
+	if sub.FtEndDate != nil {
+		p.FtEndDate = timestamppb.New(*sub.FtEndDate)
+	}
+	return p
 }
 
 func toProtoList(subs []models.Subscription) []*subscriptionv1.Subscription {
 	out := make([]*subscriptionv1.Subscription, 0, len(subs))
 	for _, sub := range subs {
-		out = append(out, &subscriptionv1.Subscription{
-			Id:          sub.ID,
-			UserId:      sub.UserID,
-			Name:        sub.Name,
-			BillingDate: timestamppb.New(sub.NextBillingDate),
-		})
+		out = append(out, toProto(sub))
 	}
 	return out
 }
