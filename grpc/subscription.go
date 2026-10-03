@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -56,6 +57,25 @@ func (s *SubscriptionServer) ListDueReminders(
 		})
 	}
 	return &subscriptionv1.ListDueRemindersResponse{Reminders: out}, nil
+}
+
+func (s *SubscriptionServer) AdvanceBillingDates(
+	ctx context.Context,
+	req *subscriptionv1.AdvanceBillingDatesRequest,
+) (*subscriptionv1.AdvanceBillingDatesResponse, error) {
+	if err := validateDate(req.GetDate()); err != nil {
+		return nil, err
+	}
+
+	advanced, converted, err := s.uc.AdvanceBillingDates(ctx, req.GetDate())
+	if err != nil {
+		log.Printf("advance billing dates %s: advanced=%d converted=%d err=%v", req.GetDate(), advanced, converted, err)
+		return nil, err
+	}
+	return &subscriptionv1.AdvanceBillingDatesResponse{
+		AdvancedCount:        advanced,
+		TrialsConvertedCount: converted,
+	}, nil
 }
 
 func validateDate(date string) error {

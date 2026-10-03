@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,6 +24,9 @@ type SubscriptionRepository interface {
 	Summary(ctx context.Context, userID string) (models.SubscriptionSummary, error)
 	ListByUser(ctx context.Context, userID string) ([]models.Subscription, error)
 	ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error)
+	ConvertEndedTrials(ctx context.Context, date string) (int64, error)
+	ListPastBilling(ctx context.Context, date string) ([]models.Subscription, error)
+	AdvanceBillingDate(ctx context.Context, id string, from, to time.Time) (bool, error)
 }
 
 type SubscriptionPostgres struct {
@@ -201,6 +205,45 @@ func (r *SubscriptionPostgres) ListDueReminders(ctx context.Context, date string
 		out = append(out, d)
 	}
 	return out, rows.Err()
+}
+
+func (r *SubscriptionPostgres) ConvertEndedTrials(ctx context.Context, date string) (int64, error) {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE subscriptions SET status = $2, updated_at = now()
+		 WHERE status = $3 AND (ft_end_date AT TIME ZONE 'Asia/Bangkok')::date < $1::date`,
+		date, models.StatusActive, models.StatusFreeTrial,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *SubscriptionPostgres) ListPastBilling(ctx context.Context, date string) ([]models.Subscription, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+subscriptionColumns+` FROM subscriptions
+		 WHERE status IN ($2, $3) AND (next_billing_date AT TIME ZONE 'Asia/Bangkok')::date < $1::date
+		 ORDER BY id`,
+		date, models.StatusActive, models.StatusFreeTrial,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanSubscriptions(rows)
+}
+
+// AdvanceBillingDate only updates when the stored date is still from, so a concurrent user edit wins.
+func (r *SubscriptionPostgres) AdvanceBillingDate(ctx context.Context, id string, from, to time.Time) (bool, error) {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE subscriptions SET next_billing_date = $3, updated_at = now()
+		 WHERE id = $1 AND next_billing_date = $2`,
+		id, from, to,
+	)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
 }
 
 // Helpers

@@ -148,6 +148,53 @@ func (u *SubscriptionUsecase) ListDueReminders(ctx context.Context, date string)
 	return u.repo.ListDueReminders(ctx, date)
 }
 
+// AdvanceBillingDates turns ended free trials into active records and go to the first cycle date
+func (u *SubscriptionUsecase) AdvanceBillingDates(ctx context.Context, date string) (advanced, converted int64, err error) {
+	today, err := time.ParseInLocation(time.DateOnly, date, u.loc)
+	if err != nil {
+		return 0, 0, fmt.Errorf("%w: date must be YYYY-MM-DD", ErrValidation)
+	}
+
+	converted, err = u.repo.ConvertEndedTrials(ctx, date)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	past, err := u.repo.ListPastBilling(ctx, date)
+	if err != nil {
+		return 0, converted, err
+	}
+
+	var errs error
+	for _, s := range past {
+		next := s.NextBillingDate
+		for next.Before(today) {
+			next = nextCycle(next, s.Type, s.BillingDay, u.loc)
+		}
+		ok, err := u.repo.AdvanceBillingDate(ctx, s.ID, s.NextBillingDate, next)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("subscription %s: %w", s.ID, err))
+			continue
+		}
+		if ok {
+			advanced++
+		}
+	}
+	return advanced, converted, errs
+}
+
+// nextCycle rebuilds the date from billingDay
+func nextCycle(cur time.Time, typ string, billingDay int, loc *time.Location) time.Time {
+	l := cur.In(loc)
+	months := time.Month(1)
+	if typ == models.TypeYearly {
+		months = 12
+	}
+	first := time.Date(l.Year(), l.Month()+months, 1, l.Hour(), l.Minute(), l.Second(), 0, loc)
+	last := first.AddDate(0, 1, -1).Day()
+	return time.Date(first.Year(), first.Month(), min(billingDay, last), l.Hour(), l.Minute(), l.Second(), 0, loc)
+}
+
 func validateInput(in *SubscriptionInput) error {
 	if in.Status == "" {
 		in.Status = models.StatusActive
