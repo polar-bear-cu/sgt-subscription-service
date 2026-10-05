@@ -28,11 +28,18 @@ type Subscription struct {
 	Type                   string
 	Category               string
 	NextBillingDate        time.Time
+	BillingDay             int
 	ReminderTimeInAdvanced int64
 	FtEndDate              *time.Time
 	Status                 string
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
+}
+
+type DueReminder struct {
+	Subscription
+	BillingDue  bool
+	TrialEndDue bool
 }
 
 type SubscriptionSummary struct {

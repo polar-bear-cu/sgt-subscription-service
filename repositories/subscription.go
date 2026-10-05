@@ -23,7 +23,10 @@ type SubscriptionRepository interface {
 	List(ctx context.Context, userID string, p ListParams) ([]models.Subscription, int, error)
 	Summary(ctx context.Context, userID string) (models.SubscriptionSummary, error)
 	ListByUser(ctx context.Context, userID string) ([]models.Subscription, error)
-	ListUpcomingForBilling(ctx context.Context, within time.Duration) ([]models.Subscription, error)
+	ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error)
+	ConvertEndedTrials(ctx context.Context, date string) (int64, error)
+	ListPastBilling(ctx context.Context, date string) ([]models.Subscription, error)
+	AdvanceBillingDate(ctx context.Context, id string, from, to time.Time) (bool, error)
 }
 
 type SubscriptionPostgres struct {
@@ -55,18 +58,18 @@ var sortColumns = map[string]string{
 	"nextBillingDate": "next_billing_date",
 }
 
-const subscriptionColumns = `id, user_id, name, cost, type, category, next_billing_date,
+const subscriptionColumns = `id, user_id, name, cost, type, category, next_billing_date, billing_day,
 	reminder_time_in_advanced, ft_end_date, status, created_at, updated_at`
 
 // Methods
 func (r *SubscriptionPostgres) Create(ctx context.Context, s models.Subscription) (models.Subscription, error) {
 	row := r.db.QueryRow(ctx,
 		`INSERT INTO subscriptions
-			(user_id, name, cost, type, category, next_billing_date, reminder_time_in_advanced, ft_end_date, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			(user_id, name, cost, type, category, next_billing_date, reminder_time_in_advanced, ft_end_date, status, billing_day)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		 RETURNING `+subscriptionColumns,
 		s.UserID, s.Name, s.Cost, s.Type, s.Category, s.NextBillingDate,
-		s.ReminderTimeInAdvanced, s.FtEndDate, s.Status,
+		s.ReminderTimeInAdvanced, s.FtEndDate, s.Status, s.BillingDay,
 	)
 	return scanSubscription(row)
 }
@@ -83,11 +86,11 @@ func (r *SubscriptionPostgres) Update(ctx context.Context, s models.Subscription
 	row := r.db.QueryRow(ctx,
 		`UPDATE subscriptions
 		 SET name = $3, cost = $4, type = $5, category = $6, next_billing_date = $7,
-		     reminder_time_in_advanced = $8, ft_end_date = $9, status = $10, updated_at = now()
+		     reminder_time_in_advanced = $8, ft_end_date = $9, status = $10, billing_day = $11, updated_at = now()
 		 WHERE id = $1 AND user_id = $2
 		 RETURNING `+subscriptionColumns,
 		s.ID, s.UserID, s.Name, s.Cost, s.Type, s.Category, s.NextBillingDate,
-		s.ReminderTimeInAdvanced, s.FtEndDate, s.Status,
+		s.ReminderTimeInAdvanced, s.FtEndDate, s.Status, s.BillingDay,
 	)
 	return scanSubscription(row)
 }
@@ -168,13 +171,60 @@ func (r *SubscriptionPostgres) ListByUser(ctx context.Context, userID string) ([
 	return scanSubscriptions(rows)
 }
 
-func (r *SubscriptionPostgres) ListUpcomingForBilling(ctx context.Context, within time.Duration) ([]models.Subscription, error) {
+func (r *SubscriptionPostgres) ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error) {
+	rows, err := r.db.Query(ctx,
+		`WITH d AS (
+			SELECT `+subscriptionColumns+`,
+				(next_billing_date AT TIME ZONE 'Asia/Bangkok')::date - reminder_time_in_advanced::int = $1::date
+					AS billing_due,
+				COALESCE(status = $3
+					AND (ft_end_date AT TIME ZONE 'Asia/Bangkok')::date - reminder_time_in_advanced::int = $1::date, false)
+					AS trial_end_due
+			FROM subscriptions
+			WHERE status IN ($2, $3)
+		)
+		SELECT * FROM d WHERE billing_due OR trial_end_due ORDER BY id`,
+		date, models.StatusActive, models.StatusFreeTrial,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]models.DueReminder, 0)
+	for rows.Next() {
+		var d models.DueReminder
+		s := &d.Subscription
+		if err := rows.Scan(
+			&s.ID, &s.UserID, &s.Name, &s.Cost, &s.Type, &s.Category, &s.NextBillingDate, &s.BillingDay,
+			&s.ReminderTimeInAdvanced, &s.FtEndDate, &s.Status, &s.CreatedAt, &s.UpdatedAt,
+			&d.BillingDue, &d.TrialEndDue,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+func (r *SubscriptionPostgres) ConvertEndedTrials(ctx context.Context, date string) (int64, error) {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE subscriptions SET status = $2, updated_at = now()
+		 WHERE status = $3 AND (ft_end_date AT TIME ZONE 'Asia/Bangkok')::date < $1::date`,
+		date, models.StatusActive, models.StatusFreeTrial,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *SubscriptionPostgres) ListPastBilling(ctx context.Context, date string) ([]models.Subscription, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+subscriptionColumns+` FROM subscriptions
-		 WHERE status IN ($1, $2)
-		   AND next_billing_date BETWEEN now() AND $3
-		 ORDER BY next_billing_date`,
-		models.StatusActive, models.StatusFreeTrial, time.Now().Add(within),
+		 WHERE status IN ($2, $3) AND (next_billing_date AT TIME ZONE 'Asia/Bangkok')::date < $1::date
+		 ORDER BY id`,
+		date, models.StatusActive, models.StatusFreeTrial,
 	)
 	if err != nil {
 		return nil, err
@@ -183,11 +233,24 @@ func (r *SubscriptionPostgres) ListUpcomingForBilling(ctx context.Context, withi
 	return scanSubscriptions(rows)
 }
 
+// AdvanceBillingDate only updates when the stored date is still from, so a concurrent user edit wins.
+func (r *SubscriptionPostgres) AdvanceBillingDate(ctx context.Context, id string, from, to time.Time) (bool, error) {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE subscriptions SET next_billing_date = $3, updated_at = now()
+		 WHERE id = $1 AND next_billing_date = $2`,
+		id, from, to,
+	)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
 // Helpers
 func scanSubscription(row pgx.Row) (models.Subscription, error) {
 	var s models.Subscription
 	err := row.Scan(
-		&s.ID, &s.UserID, &s.Name, &s.Cost, &s.Type, &s.Category, &s.NextBillingDate,
+		&s.ID, &s.UserID, &s.Name, &s.Cost, &s.Type, &s.Category, &s.NextBillingDate, &s.BillingDay,
 		&s.ReminderTimeInAdvanced, &s.FtEndDate, &s.Status, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

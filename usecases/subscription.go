@@ -25,17 +25,20 @@ type SubscriptionInput struct {
 
 type SubscriptionUsecase struct {
 	repo repositories.SubscriptionRepository
+	loc  *time.Location
 }
 
-func NewSubscription(repo repositories.SubscriptionRepository) *SubscriptionUsecase {
-	return &SubscriptionUsecase{repo: repo}
+func NewSubscription(repo repositories.SubscriptionRepository, loc *time.Location) *SubscriptionUsecase {
+	return &SubscriptionUsecase{repo: repo, loc: loc}
 }
 
 func (u *SubscriptionUsecase) Create(ctx context.Context, userID string, in SubscriptionInput) (models.Subscription, error) {
 	if err := validateInput(&in); err != nil {
 		return models.Subscription{}, err
 	}
-	return u.repo.Create(ctx, toModel(userID, in))
+	s := toModel(userID, in)
+	s.BillingDay = in.NextBillingDate.In(u.loc).Day()
+	return u.repo.Create(ctx, s)
 }
 
 func (u *SubscriptionUsecase) GetByID(ctx context.Context, userID, id string) (models.Subscription, error) {
@@ -46,8 +49,18 @@ func (u *SubscriptionUsecase) Update(ctx context.Context, userID, id string, in 
 	if err := validateInput(&in); err != nil {
 		return models.Subscription{}, err
 	}
+	current, err := u.repo.FindByID(ctx, id, userID)
+	if err != nil {
+		return models.Subscription{}, err
+	}
+
 	s := toModel(userID, in)
 	s.ID = id
+	// Keep the anchor when the date is unchanged: a date clamped to Feb 28 must still return to the 31st.
+	s.BillingDay = current.BillingDay
+	if !in.NextBillingDate.Equal(current.NextBillingDate) {
+		s.BillingDay = in.NextBillingDate.In(u.loc).Day()
+	}
 	return u.repo.Update(ctx, s)
 }
 
@@ -131,8 +144,55 @@ func (u *SubscriptionUsecase) ListByUser(ctx context.Context, userID string) ([]
 	return u.repo.ListByUser(ctx, userID)
 }
 
-func (u *SubscriptionUsecase) GetUpcomingForBilling(ctx context.Context, within time.Duration) ([]models.Subscription, error) {
-	return u.repo.ListUpcomingForBilling(ctx, within)
+func (u *SubscriptionUsecase) ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error) {
+	return u.repo.ListDueReminders(ctx, date)
+}
+
+// AdvanceBillingDates turns ended free trials into active records and go to the first cycle date
+func (u *SubscriptionUsecase) AdvanceBillingDates(ctx context.Context, date string) (advanced, converted int64, err error) {
+	today, err := time.ParseInLocation(time.DateOnly, date, u.loc)
+	if err != nil {
+		return 0, 0, fmt.Errorf("%w: date must be YYYY-MM-DD", ErrValidation)
+	}
+
+	converted, err = u.repo.ConvertEndedTrials(ctx, date)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	past, err := u.repo.ListPastBilling(ctx, date)
+	if err != nil {
+		return 0, converted, err
+	}
+
+	var errs error
+	for _, s := range past {
+		next := s.NextBillingDate
+		for next.Before(today) {
+			next = nextCycle(next, s.Type, s.BillingDay, u.loc)
+		}
+		ok, err := u.repo.AdvanceBillingDate(ctx, s.ID, s.NextBillingDate, next)
+		if err != nil {
+			errs = errors.Join(errs, fmt.Errorf("subscription %s: %w", s.ID, err))
+			continue
+		}
+		if ok {
+			advanced++
+		}
+	}
+	return advanced, converted, errs
+}
+
+// nextCycle rebuilds the date from billingDay
+func nextCycle(cur time.Time, typ string, billingDay int, loc *time.Location) time.Time {
+	l := cur.In(loc)
+	months := time.Month(1)
+	if typ == models.TypeYearly {
+		months = 12
+	}
+	first := time.Date(l.Year(), l.Month()+months, 1, l.Hour(), l.Minute(), l.Second(), 0, loc)
+	last := first.AddDate(0, 1, -1).Day()
+	return time.Date(first.Year(), first.Month(), min(billingDay, last), l.Hour(), l.Minute(), l.Second(), 0, loc)
 }
 
 func validateInput(in *SubscriptionInput) error {
