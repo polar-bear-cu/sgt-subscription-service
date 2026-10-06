@@ -20,6 +20,7 @@ type SubscriptionRepository interface {
 	Update(ctx context.Context, s models.Subscription) (models.Subscription, error)
 	UpdateStatus(ctx context.Context, id, userID, status string) (models.Subscription, error)
 	Delete(ctx context.Context, id, userID string) error
+	DeleteByUser(ctx context.Context, userID string) (int64, error)
 	List(ctx context.Context, userID string, p ListParams) ([]models.Subscription, int, error)
 	Summary(ctx context.Context, userID string) (models.SubscriptionSummary, error)
 	ListByUser(ctx context.Context, userID string) ([]models.Subscription, error)
@@ -114,6 +115,11 @@ func (r *SubscriptionPostgres) Delete(ctx context.Context, id, userID string) er
 		return ErrSubscriptionNotFound
 	}
 	return nil
+}
+
+func (r *SubscriptionPostgres) DeleteByUser(ctx context.Context, userID string) (int64, error) {
+	tag, err := r.db.Exec(ctx, `DELETE FROM subscriptions WHERE user_id = $1`, userID)
+	return tag.RowsAffected(), err
 }
 
 func (r *SubscriptionPostgres) List(ctx context.Context, userID string, p ListParams) ([]models.Subscription, int, error) {

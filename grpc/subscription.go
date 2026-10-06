@@ -78,6 +78,17 @@ func (s *SubscriptionServer) AdvanceBillingDates(
 	}, nil
 }
 
+func (s *SubscriptionServer) DeleteSubscriptionsByUser(
+	ctx context.Context,
+	req *subscriptionv1.DeleteSubscriptionsByUserRequest,
+) (*subscriptionv1.DeleteSubscriptionsByUserResponse, error) {
+	deleted, err := s.uc.DeleteByUser(ctx, req.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	return &subscriptionv1.DeleteSubscriptionsByUserResponse{DeletedCount: deleted}, nil
+}
+
 func validateDate(date string) error {
 	if _, err := time.Parse(time.DateOnly, date); err != nil {
 		return status.Error(codes.InvalidArgument, "date must be YYYY-MM-DD")

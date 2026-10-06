@@ -81,6 +81,10 @@ func (u *SubscriptionUsecase) Delete(ctx context.Context, userID, id string) err
 	return u.repo.Delete(ctx, id, userID)
 }
 
+func (u *SubscriptionUsecase) DeleteByUser(ctx context.Context, userID string) (int64, error) {
+	return u.repo.DeleteByUser(ctx, userID)
+}
+
 const (
 	defaultPageLimit = 10
 	maxPageLimit     = 100
