@@ -48,3 +48,11 @@ jobs:
           tags: |
             ghcr.io/polar-bear-cu/sgt-subscription-service:${{ github.ref_name }}
             ghcr.io/polar-bear-cu/sgt-subscription-service:${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrate
+          push: true
+          tags: |
+            ghcr.io/polar-bear-cu/sgt-subscription-service-migrate:${{ github.ref_name }}
+            ghcr.io/polar-bear-cu/sgt-subscription-service-migrate:${{ github.sha }}
