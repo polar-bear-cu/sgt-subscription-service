@@ -5,6 +5,9 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /server .
 
+FROM migrate/migrate:v4.18.1 AS migrate
+COPY migrations /migrations
+
 FROM alpine:3.20
 RUN apk add --no-cache tzdata ca-certificates
 ENV TZ=Asia/Bangkok
