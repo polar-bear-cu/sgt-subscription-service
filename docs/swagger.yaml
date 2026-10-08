@@ -1,23 +1,4 @@
 definitions:
-  dtos.CreateSubscriptionRequest:
-    properties:
-      billingDate:
-        type: string
-      name:
-        type: string
-    required:
-    - billingDate
-    - name
-    type: object
-  dtos.CreateSubscriptionResponse:
-    properties:
-      billingDate:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-    type: object
   dtos.HealthResponse:
     properties:
       serviceName:
@@ -27,6 +8,104 @@ definitions:
       timestamp:
         type: string
     type: object
+  dtos.ListSubscriptionsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/dtos.SubscriptionResponse'
+        type: array
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      totalPages:
+        type: integer
+    type: object
+  dtos.SubscriptionRequest:
+    properties:
+      category:
+        enum:
+        - streaming
+        - music
+        - productivity
+        - technology
+        type: string
+      cost:
+        minimum: 0
+        type: number
+      ftEndDate:
+        type: string
+      name:
+        maxLength: 50
+        type: string
+      nextBillingDate:
+        type: string
+      reminderTimeInAdvanced:
+        minimum: 1
+        type: integer
+      status:
+        enum:
+        - active
+        - free_trial
+        - inactive
+        type: string
+      type:
+        enum:
+        - monthly
+        - yearly
+        type: string
+    required:
+    - category
+    - name
+    - nextBillingDate
+    - reminderTimeInAdvanced
+    - type
+    type: object
+  dtos.SubscriptionResponse:
+    properties:
+      category:
+        type: string
+      cost:
+        type: number
+      createdAt:
+        type: string
+      ftEndDate:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      nextBillingDate:
+        type: string
+      reminderTimeInAdvanced:
+        type: integer
+      status:
+        type: string
+      type:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  dtos.SummaryResponse:
+    properties:
+      count:
+        type: integer
+      monthlyCost:
+        type: number
+    type: object
+  dtos.UpdateStatusRequest:
+    properties:
+      status:
+        enum:
+        - active
+        - free_trial
+        - inactive
+        type: string
+    required:
+    - status
+    type: object
 info:
   contact: {}
   description: REST API for the Subglutee subscription service
@@ -34,6 +113,78 @@ info:
   version: "1.0"
 paths:
   /api/v1/subscriptions:
+    get:
+      parameters:
+      - enum:
+        - streaming
+        - music
+        - productivity
+        - technology
+        in: query
+        name: category
+        type: string
+      - in: query
+        name: limit
+        type: integer
+      - in: query
+        name: name
+        type: string
+      - enum:
+        - asc
+        - desc
+        in: query
+        name: order
+        type: string
+      - in: query
+        name: page
+        type: integer
+      - enum:
+        - name
+        - category
+        - status
+        - type
+        - cost
+        - nextBillingDate
+        in: query
+        name: sortBy
+        type: string
+      - enum:
+        - active
+        - free_trial
+        - inactive
+        in: query
+        name: status
+        type: string
+      - enum:
+        - monthly
+        - yearly
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.ListSubscriptionsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: list my subscriptions (filter, sort, paginate)
+      tags:
+      - subscriptions
     post:
       consumes:
       - application/json
@@ -43,16 +194,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/dtos.CreateSubscriptionRequest'
+          $ref: '#/definitions/dtos.SubscriptionRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/dtos.CreateSubscriptionResponse'
+            $ref: '#/definitions/dtos.SubscriptionResponse'
         "400":
           description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
           schema:
             additionalProperties:
               type: string
@@ -63,7 +220,179 @@ paths:
             additionalProperties:
               type: string
             type: object
+      security:
+      - BearerAuth: []
       summary: create a subscription
+      tags:
+      - subscriptions
+  /api/v1/subscriptions/{id}:
+    delete:
+      parameters:
+      - description: subscription id
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: delete a subscription
+      tags:
+      - subscriptions
+    get:
+      parameters:
+      - description: subscription id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.SubscriptionResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: get a subscription
+      tags:
+      - subscriptions
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: subscription id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: new status
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.SubscriptionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: change subscription status
+      tags:
+      - subscriptions
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: subscription id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: subscription
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dtos.SubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.SubscriptionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: update a subscription (all fields)
+      tags:
+      - subscriptions
+  /api/v1/subscriptions/summary:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dtos.SummaryResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: count and monthly cost of my active / free-trial subscriptions (yearly
+        / 12)
       tags:
       - subscriptions
   /health:
@@ -78,4 +407,10 @@ paths:
       summary: health check
       tags:
       - ops
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer " followed by the access token from sgt-auth-service.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

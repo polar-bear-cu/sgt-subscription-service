@@ -27,8 +27,18 @@ import (
 // @title        Subscription Service API
 // @version      1.0
 // @description  REST API for the Subglutee subscription service
+//
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
+// @description                 Type "Bearer " followed by the access token from sgt-auth-service.
 func main() {
 	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	loc, err := time.LoadLocation("Asia/Bangkok")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,7 +53,7 @@ func main() {
 	defer pool.Close()
 
 	repo := repositories.NewSubscriptionPostgres(pool)
-	uc := usecases.NewSubscription(repo)
+	uc := usecases.NewSubscription(repo, loc)
 	subCtrl := controllers.NewSubscriptionController(uc)
 
 	gs, lis, err := newGRPCServer(ctx, cfg.GRPCPort, uc)
@@ -58,7 +68,7 @@ func main() {
 	}()
 
 	r := gin.Default()
-	routes.Register(r, subCtrl, cfg.SwaggerEnabled)
+	routes.Register(r, subCtrl, cfg.JWTSecret, cfg.SwaggerEnabled)
 	srv := &http.Server{Addr: ":" + cfg.Port, Handler: r}
 
 	go func() {
