@@ -181,10 +181,12 @@ func (r *SubscriptionPostgres) ListDueReminders(ctx context.Context, date string
 	rows, err := r.db.Query(ctx,
 		`WITH d AS (
 			SELECT `+subscriptionColumns+`,
-				(next_billing_date AT TIME ZONE 'Asia/Bangkok')::date - reminder_time_in_advanced::int = $1::date
+				$1::date BETWEEN (next_billing_date AT TIME ZONE 'Asia/Bangkok')::date - reminder_time_in_advanced::int
+					AND (next_billing_date AT TIME ZONE 'Asia/Bangkok')::date
 					AS billing_due,
 				COALESCE(status = $3
-					AND (ft_end_date AT TIME ZONE 'Asia/Bangkok')::date - reminder_time_in_advanced::int = $1::date, false)
+					AND $1::date BETWEEN (ft_end_date AT TIME ZONE 'Asia/Bangkok')::date - reminder_time_in_advanced::int
+						AND (ft_end_date AT TIME ZONE 'Asia/Bangkok')::date, false)
 					AS trial_end_due
 			FROM subscriptions
 			WHERE status IN ($2, $3)
