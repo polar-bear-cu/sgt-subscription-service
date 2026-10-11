@@ -43,11 +43,14 @@ type DueReminder struct {
 }
 
 type Charge struct {
-	ID             string
-	SubscriptionID string
-	Type           string
-	Amount         float64
-	ChargedAt      time.Time
+	ID                 string
+	SubscriptionID     string
+	Name               string
+	Category           string
+	Type               string
+	Amount             float64
+	ChargedAt          time.Time
+	SubscriptionStatus string
 }
 
 type SubscriptionSummary struct {

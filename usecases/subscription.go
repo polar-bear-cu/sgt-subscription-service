@@ -148,6 +148,10 @@ func (u *SubscriptionUsecase) ListByUser(ctx context.Context, userID string) ([]
 	return u.repo.ListByUser(ctx, userID)
 }
 
+func (u *SubscriptionUsecase) ListCharges(ctx context.Context, userID, from, to string) ([]models.Charge, error) {
+	return u.repo.ListCharges(ctx, userID, from, to)
+}
+
 func (u *SubscriptionUsecase) ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error) {
 	return u.repo.ListDueReminders(ctx, date)
 }
