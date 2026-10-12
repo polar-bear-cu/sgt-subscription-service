@@ -153,7 +153,24 @@ func (u *SubscriptionUsecase) ListCharges(ctx context.Context, userID, from, to 
 }
 
 func (u *SubscriptionUsecase) ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error) {
-	return u.repo.ListDueReminders(ctx, date)
+	due, err := u.repo.ListDueReminders(ctx, date)
+	if err != nil {
+		return nil, err
+	}
+	for i := range due {
+		d := &due[i]
+		if !d.BillingDue || !d.TrialEndDue || d.FtEndDate == nil {
+			continue
+		}
+		billingDay := d.NextBillingDate.In(u.loc).Format(time.DateOnly)
+		trialDay := d.FtEndDate.In(u.loc).Format(time.DateOnly)
+		if billingDay < trialDay {
+			d.TrialEndDue = false
+		} else if trialDay < billingDay {
+			d.BillingDue = false
+		}
+	}
+	return due, nil
 }
 
 // AdvanceBillingDates turns ended free trials into active records and go to the first cycle date.
