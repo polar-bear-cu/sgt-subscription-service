@@ -89,6 +89,41 @@ func (s *SubscriptionServer) DeleteSubscriptionsByUser(
 	return &subscriptionv1.DeleteSubscriptionsByUserResponse{DeletedCount: deleted}, nil
 }
 
+func (s *SubscriptionServer) ListCharges(
+	ctx context.Context,
+	req *subscriptionv1.ListChargesRequest,
+) (*subscriptionv1.ListChargesResponse, error) {
+	if err := validateDate(req.GetFrom()); err != nil {
+		return nil, err
+	}
+	if err := validateDate(req.GetTo()); err != nil {
+		return nil, err
+	}
+	if req.GetFrom() >= req.GetTo() {
+		return nil, status.Error(codes.InvalidArgument, "from must be before to")
+	}
+
+	charges, err := s.uc.ListCharges(ctx, req.GetUserId(), req.GetFrom(), req.GetTo())
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]*subscriptionv1.Charge, 0, len(charges))
+	for _, c := range charges {
+		out = append(out, &subscriptionv1.Charge{
+			Id:                 c.ID,
+			SubscriptionId:     c.SubscriptionID,
+			Name:               c.Name,
+			Category:           c.Category,
+			Type:               c.Type,
+			Amount:             c.Amount,
+			ChargedAt:          timestamppb.New(c.ChargedAt),
+			SubscriptionStatus: c.SubscriptionStatus,
+		})
+	}
+	return &subscriptionv1.ListChargesResponse{Charges: out}, nil
+}
+
 func validateDate(date string) error {
 	if _, err := time.Parse(time.DateOnly, date); err != nil {
 		return status.Error(codes.InvalidArgument, "date must be YYYY-MM-DD")

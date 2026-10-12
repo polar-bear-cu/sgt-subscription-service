@@ -27,7 +27,8 @@ type SubscriptionRepository interface {
 	ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error)
 	ConvertEndedTrials(ctx context.Context, date string) (int64, error)
 	ListPastBilling(ctx context.Context, date string) ([]models.Subscription, error)
-	AdvanceBillingDate(ctx context.Context, id string, from, to time.Time) (bool, error)
+	AdvanceBillingDate(ctx context.Context, id string, from, to time.Time, charges []models.Charge) (bool, error)
+	ListCharges(ctx context.Context, userID, from, to string) ([]models.Charge, error)
 }
 
 type SubscriptionPostgres struct {
@@ -240,8 +241,20 @@ func (r *SubscriptionPostgres) ListPastBilling(ctx context.Context, date string)
 }
 
 // AdvanceBillingDate only updates when the stored date is still from, so a concurrent user edit wins.
-func (r *SubscriptionPostgres) AdvanceBillingDate(ctx context.Context, id string, from, to time.Time) (bool, error) {
-	tag, err := r.db.Exec(ctx,
+// The charges are saved in the same transaction, so they are kept only when the date moves.
+func (r *SubscriptionPostgres) AdvanceBillingDate(
+	ctx context.Context,
+	id string,
+	from, to time.Time,
+	charges []models.Charge,
+) (bool, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx,
 		`UPDATE subscriptions SET next_billing_date = $3, updated_at = now()
 		 WHERE id = $1 AND next_billing_date = $2`,
 		id, from, to,
@@ -249,7 +262,50 @@ func (r *SubscriptionPostgres) AdvanceBillingDate(ctx context.Context, id string
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() == 1, nil
+	if tag.RowsAffected() != 1 {
+		return false, nil
+	}
+
+	for _, c := range charges {
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO charges (subscription_id, type, amount, charged_at)
+			 VALUES ($1, $2, $3, $4)
+			 ON CONFLICT (subscription_id, charged_at) DO NOTHING`,
+			c.SubscriptionID, c.Type, c.Amount, c.ChargedAt,
+		); err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit(ctx)
+}
+
+func (r *SubscriptionPostgres) ListCharges(ctx context.Context, userID, from, to string) ([]models.Charge, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT c.id, c.subscription_id, s.name, s.category, c.type, c.amount, c.charged_at, s.status
+		 FROM charges c
+		 JOIN subscriptions s ON s.id = c.subscription_id
+		 WHERE s.user_id = $1
+		   AND (c.charged_at AT TIME ZONE 'Asia/Bangkok')::date >= $2::date
+		   AND (c.charged_at AT TIME ZONE 'Asia/Bangkok')::date < $3::date
+		 ORDER BY c.charged_at, c.id`,
+		userID, from, to,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]models.Charge, 0)
+	for rows.Next() {
+		var c models.Charge
+		if err := rows.Scan(
+			&c.ID, &c.SubscriptionID, &c.Name, &c.Category, &c.Type, &c.Amount, &c.ChargedAt, &c.SubscriptionStatus,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }
 
 // Helpers

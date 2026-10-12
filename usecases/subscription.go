@@ -148,11 +148,16 @@ func (u *SubscriptionUsecase) ListByUser(ctx context.Context, userID string) ([]
 	return u.repo.ListByUser(ctx, userID)
 }
 
+func (u *SubscriptionUsecase) ListCharges(ctx context.Context, userID, from, to string) ([]models.Charge, error) {
+	return u.repo.ListCharges(ctx, userID, from, to)
+}
+
 func (u *SubscriptionUsecase) ListDueReminders(ctx context.Context, date string) ([]models.DueReminder, error) {
 	return u.repo.ListDueReminders(ctx, date)
 }
 
-// AdvanceBillingDates turns ended free trials into active records and go to the first cycle date
+// AdvanceBillingDates turns ended free trials into active records and go to the first cycle date.
+// Every passed cycle of an active record is saved as a charge.
 func (u *SubscriptionUsecase) AdvanceBillingDates(ctx context.Context, date string) (advanced, converted int64, err error) {
 	today, err := time.ParseInLocation(time.DateOnly, date, u.loc)
 	if err != nil {
@@ -171,11 +176,20 @@ func (u *SubscriptionUsecase) AdvanceBillingDates(ctx context.Context, date stri
 
 	var errs error
 	for _, s := range past {
+		var charges []models.Charge
 		next := s.NextBillingDate
 		for next.Before(today) {
+			if s.Status == models.StatusActive {
+				charges = append(charges, models.Charge{
+					SubscriptionID: s.ID,
+					Type:           s.Type,
+					Amount:         s.Cost,
+					ChargedAt:      next,
+				})
+			}
 			next = nextCycle(next, s.Type, s.BillingDay, u.loc)
 		}
-		ok, err := u.repo.AdvanceBillingDate(ctx, s.ID, s.NextBillingDate, next)
+		ok, err := u.repo.AdvanceBillingDate(ctx, s.ID, s.NextBillingDate, next, charges)
 		if err != nil {
 			errs = errors.Join(errs, fmt.Errorf("subscription %s: %w", s.ID, err))
 			continue

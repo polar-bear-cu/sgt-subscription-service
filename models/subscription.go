@@ -42,6 +42,17 @@ type DueReminder struct {
 	TrialEndDue bool
 }
 
+type Charge struct {
+	ID                 string
+	SubscriptionID     string
+	Name               string
+	Category           string
+	Type               string
+	Amount             float64
+	ChargedAt          time.Time
+	SubscriptionStatus string
+}
+
 type SubscriptionSummary struct {
 	Count       int
 	MonthlyCost float64
